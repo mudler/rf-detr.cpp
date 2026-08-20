@@ -11,7 +11,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
+#include <system_error>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
@@ -131,13 +133,15 @@ static int cmd_detect(const rfdetr_cli::DetectArgs& a) {
 
     /* 7. Optional per-detection mask PNGs (seg models only). */
     if (!a.masks_dir.empty()) {
-        /* Create the masks directory if it doesn't exist. */
-        struct stat st_buf;
-        if (::stat(a.masks_dir.c_str(), &st_buf) != 0) {
-            if (::mkdir(a.masks_dir.c_str(), 0755) != 0) {
-                std::fprintf(stderr, "failed to create masks dir '%s'\n",
-                             a.masks_dir.c_str());
-            }
+        /* Create the masks directory if it doesn't exist. std::filesystem
+         * rather than stat + ::mkdir: MSVC has no POSIX mkdir (only _mkdir,
+         * in <direct.h>), and create_directories already succeeds silently
+         * when the directory is there, so the stat probe goes with it. */
+        std::error_code mkdir_ec;
+        std::filesystem::create_directories(a.masks_dir, mkdir_ec);
+        if (mkdir_ec) {
+            std::fprintf(stderr, "failed to create masks dir '%s'\n",
+                         a.masks_dir.c_str());
         }
         size_t n_written = 0;
         for (size_t i = 0; i < n; ++i) {
