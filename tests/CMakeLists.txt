@@ -38,7 +38,10 @@ rfdetr_add_test(test_visualize)
 
 rfdetr_add_test(test_cli_smoke)
 
-if(TARGET rfdetr-cli)
+# test_cli_integration drives the CLI as a child process through <sys/wait.h>,
+# so it is POSIX-only. Everything else in this directory is portable; excluding
+# just this one keeps the rest of the suite running under MSVC.
+if(TARGET rfdetr-cli AND NOT WIN32)
     rfdetr_add_test(test_cli_integration)
     target_compile_definitions(test_cli_integration PRIVATE
         RFDETR_CLI_BINARY="$<TARGET_FILE:rfdetr-cli>")
