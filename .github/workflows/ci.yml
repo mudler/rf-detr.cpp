@@ -76,6 +76,60 @@ jobs:
           if-no-files-found: error
 
   # -----------------------------------------------------------------------
+  # build-windows: the same build under MSVC.
+  #
+  # Everything else in this file is ubuntu-only, so nothing here has ever
+  # compiled with MSVC, and portability breaks land silently: __attribute__,
+  # naming an automatic constexpr from a captureless lambda, and POSIX-only
+  # calls all build clean on gcc and stop MSVC on the first file.
+  #
+  # CPU only, no model downloads — this guards the compile, not the numbers,
+  # which the ubuntu smoke-test job already covers. GGML_NATIVE=ON matches the
+  # ubuntu build job: CI only has to run on its own runner.
+  # -----------------------------------------------------------------------
+  build-windows:
+    name: Build & unit tests (MSVC)
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # The CMake configure-time hook shells out to bash, which is not on PATH
+      # in the MSVC environment; run it explicitly first.
+      - name: Apply ggml patches (Git Bash)
+        shell: bash
+        run: bash scripts/apply_ggml_patches.sh
+
+      - name: MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRFDETR_BUILD_TESTS=ON \
+            -DRFDETR_BUILD_CLI=ON \
+            -DGGML_NATIVE=ON
+
+      - name: Build
+        shell: bash
+        run: cmake --build build -j
+
+      - name: Run unit tests
+        shell: bash
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Usage banner
+        shell: bash
+        run: |
+          out=$(./build/bin/rfdetr-cli.exe 2>&1 || true)
+          grep -qi usage <<<"$out"
+
+  # -----------------------------------------------------------------------
   # smoke-test: download nano (all 4 quants) + base-f16 from HF, run detect
   # on a committed test image, compare JSON output against committed refs.
   #

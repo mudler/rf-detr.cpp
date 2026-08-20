@@ -116,7 +116,10 @@ bool get_bool(gguf_context* g, const char* key, bool& out) {
  * with A = -0.5 for antialias=True. */
 void bicubic_resample_patch_grid(const float* src, int src_side, int dim,
                                  float* dst, int dst_side) {
-    constexpr float A = -0.5f;  // antialias=True path uses Keys, not Catmull-Rom
+    /* `static` so the captureless lambda below can name it: MSVC rejects an
+     * automatic constexpr there (C3493) where gcc/clang accept it. Static
+     * storage duration needs no capture, and is portable. */
+    static constexpr float A = -0.5f;  // antialias=True path uses Keys, not Catmull-Rom
     auto kernel = [](float x) -> float {
         const float ax = std::fabs(x);
         if (ax < 1.0f) {
